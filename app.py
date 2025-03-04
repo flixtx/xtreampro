@@ -1,0 +1,92 @@
+from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi.responses import JSONResponse, RedirectResponse, Response, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from jinja2 import Environment, FileSystemLoader
+from config import config
+import requests
+import base64
+from functions import get_manifest, get_catalog, get_meta, fix_b64
+import sys
+
+templates = Environment(loader=FileSystemLoader("templates"))
+app = FastAPI()
+
+def add_cors(response: Response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    template = templates.get_template("index.html")
+    response = HTMLResponse(template.render(
+        title=config['title'],
+        logo=config['logo'],
+        description=config['description'],
+        version=config['version']
+    ))
+    return add_cors(response)
+
+@app.get("/img")
+async def proxy_logo(url: str):
+    if not url:
+        return add_cors(JSONResponse(content={"error": "Nenhuma URL fornecida"}, status_code=400))
+    try:
+        response = requests.get(url, stream=True)
+        if response.status_code != 200:
+            return add_cors(JSONResponse(content={"error": f"Erro ao buscar a imagem: {response.status_code}"}, status_code=400))
+        content_type = response.headers.get("Content-Type", "image/jpeg")
+        return add_cors(Response(content=response.content, media_type=content_type))
+    except requests.exceptions.RequestException as e:
+        return add_cors(JSONResponse(content={"error": f"Erro ao buscar a imagem: {str(e)}"}, status_code=500))
+    
+@app.get("/{base64str}/manifest.json")
+async def manifest(base64str: str, request: Request):
+    if not base64str:
+        raise HTTPException(status_code=400, detail="Invalid request format")
+    base64str = fix_b64(base64str)
+    try:
+        user_conf = base64.b64decode(base64str).decode("utf-8") if base64str else None
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Base64 configuration")
+    manifest = get_manifest(base64str)
+    return add_cors(JSONResponse(content=manifest))
+
+@app.get("/configure")
+async def manifest(request: Request):
+    return RedirectResponse(url="/")
+
+@app.get("/{base64str}/catalog/{type}/{id_prefix}/genre={genre}.json")
+async def catalog_genre(base64str: str, type: str, genre: str, request: Request):
+    catalog = get_catalog(base64str, type, genre)
+    return add_cors(JSONResponse(content={"metas": catalog}))
+
+@app.get("/{base64str}/meta/{type}/{id}.json")
+async def meta(base64str: str, type: str, id: str, request: Request):
+    meta = get_meta(base64str, type, id)
+    return add_cors(JSONResponse(content={"meta": meta}))
+
+@app.get("/{base64str}/stream/{type}/{id}.json")
+async def meta(base64str: str, type: str, id: str, request: Request):
+    meta = get_meta(base64str, type, id)
+    return add_cors(JSONResponse(content={"streams": meta.get("streams", [])}))
+
+# if __name__ == "__main__":
+#     try:
+#         if "--run" in sys.argv:
+#             from uvicorn import Server, Config as Config_
+#             config_ = Config_(app=app, host="0.0.0.0", port=80)
+#             server = Server(config_)
+#             server.run()
+#     except:
+#         pass
+
+
+
+
+
+
+    
+
