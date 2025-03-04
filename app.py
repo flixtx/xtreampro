@@ -42,33 +42,56 @@ async def proxy_logo(url: str):
     except requests.exceptions.RequestException as e:
         return add_cors(JSONResponse(content={"error": f"Erro ao buscar a imagem: {str(e)}"}, status_code=500))
     
-@app.get("/{base64str}/manifest.json")
-async def manifest(base64str: str, request: Request):
-    if not base64str:
-        raise HTTPException(status_code=400, detail="Invalid request format")
-    base64str = fix_b64(base64str)
-    try:
-        user_conf = base64.b64decode(base64str).decode("utf-8") if base64str else None
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid Base64 configuration")
-    manifest = get_manifest(base64str)
+@app.get("/manifest.json")
+async def manifest_standard(request: Request):
+    manifest = {
+        'id': 'org.community.xtreampro',
+        'name': config['title'],
+        'version': config['version'],
+        'logo': config['logo'],
+        'description': config['description'],
+        'idPrefixes': ['tt'],
+        'catalogs': [],
+        'types': ["movie", "series", "tv"],
+        'resources': ["catalog", "meta", "stream"],
+        'behaviorHints': {'configurable': True, 'configurationRequired': True}
+    }
     return add_cors(JSONResponse(content=manifest))
 
 @app.get("/configure")
-async def manifest(request: Request):
+async def configure(request: Request):
     return RedirectResponse(url="/")
 
-@app.get("/{base64str}/catalog/{type}/{id_prefix}/genre={genre}.json")
+@app.get("/b64/configure")
+async def configure2(request: Request):
+    return RedirectResponse(url="/")
+    
+@app.get("/b64/{base64str}/manifest.json")
+async def manifest_custom(base64str: str, request: Request):
+    if not base64str:
+        raise HTTPException(status_code=400, detail="Invalid request format")
+    
+    base64str = fix_b64(base64str)  # Corrige possíveis erros de Base64
+
+    try:
+        user_conf = base64.b64decode(base64str).decode("utf-8")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Base64 configuration")
+
+    manifest = get_manifest(base64str)
+    return add_cors(JSONResponse(content=manifest))
+
+@app.get("/b64/{base64str}/catalog/{type}/{id_prefix}/genre={genre}.json")
 async def catalog_genre(base64str: str, type: str, genre: str, request: Request):
     catalog = get_catalog(base64str, type, genre)
     return add_cors(JSONResponse(content={"metas": catalog}))
 
-@app.get("/{base64str}/meta/{type}/{id}.json")
+@app.get("/b64/{base64str}/meta/{type}/{id}.json")
 async def meta(base64str: str, type: str, id: str, request: Request):
     meta = get_meta(base64str, type, id)
     return add_cors(JSONResponse(content={"meta": meta}))
 
-@app.get("/{base64str}/stream/{type}/{id}.json")
+@app.get("/b64/{base64str}/stream/{type}/{id}.json")
 async def meta(base64str: str, type: str, id: str, request: Request):
     meta = get_meta(base64str, type, id)
     return add_cors(JSONResponse(content={"streams": meta.get("streams", [])}))
