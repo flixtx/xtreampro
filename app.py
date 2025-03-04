@@ -63,7 +63,7 @@ async def configure(request: Request):
     return RedirectResponse(url="/")
 
 @app.get("/b64/{base64str}/configure")
-async def configure2(request: Request):
+async def configure2(base64str: str, request: Request):
     return RedirectResponse(url="/")
     
 @app.get("/b64/{base64str}/manifest.json")
