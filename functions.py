@@ -255,7 +255,7 @@ def get_meta(url, type, id):
     meta_data = json.loads(meta_response) if meta_status == 200 else []
 
     if not meta_data:
-        return []
+        return {}
 
     # Construir resposta com metadados e streams
     if type == "movie":
@@ -289,18 +289,13 @@ def get_meta(url, type, id):
         for season, episodes in meta_data.get('episodes', {}).items():
             for episode in episodes:
                 meta['videos'].append({
-                    'id': f"{obj['idPrefix']}{episode['id']}",
-                    'title': episode.get('title', f"Episode {episode.get('episode_num', '')}"),
+                    'id': f"{obj['idPrefix']}{stream_id}:{episode['id']}:{episode.get('season')}:{episode.get('episode_num')}",
+                    'name': episode.get('title', f"Episode {episode.get('episode_num', '')}"),
                     'season': episode.get('season'),
                     'episode': episode.get('episode_num'),
                     'overview': episode.get('plot', ""),
                     'thumbnail': episode.get('info', {}).get('movie_image', ""),
-                    'released': episode.get('info', {}).get('releasedate', ""),
-                    'streams': [{
-                        'name': "Watch Episode",
-                        'description': "Watch this episode",
-                        'url': f"{obj['baseURL']}/series/{obj['username']}/{obj['password']}/{episode['id']}.mp4",
-                    }],
+                    'released': episode.get('info', {}).get('releasedate', "")
                 })
 
         return meta
@@ -312,11 +307,78 @@ def get_meta(url, type, id):
                     'name': item.get('name', ""),
                     'type': type,
                     'background': "https://raw.githubusercontent.com/zoreu/xtreampro/refs/heads/main/bgwallpaper.jpg",
-                    'logo': get_image_url(item.get('stream_icon', "")),
+                    'logo': get_image_url(item.get('stream_icon', ""))
+                }
+
+    return {}
+
+def get_stream(url, type, id):
+    """Obtém metadados com base no tipo e ID."""
+    obj = get_user_data(url)
+    if not obj:
+        return []
+
+    if id.count(':') == 4:
+        stream_id = id.split(':')[1]
+        #stream_id = id.split(':')[2]
+        season = id.split(':')[3]
+        episode = id.split(':')[4]
+    elif id.count(':') == 1:
+        stream_id = id.split(':')[1]
+    else:
+        return {'streams': []}
+
+    # Determinar ação e parâmetros para buscar metadados
+    meta_action = "get_vod_info" if type == "movie" else (
+        "get_series_info" if type == "series" else "get_live_streams"
+    )
+    request_id = "vod_id" if type == "movie" else (
+        "series_id" if type == "series" else "stream_id"
+    )
+
+    params = {
+        'username': obj['username'],
+        'password': obj['password'],
+        'action': meta_action,
+    }
+    if type != "tv":
+        params[request_id] = stream_id
+
+    meta_response, meta_status = make_curl_request(f"{obj['baseURL']}/player_api.php", params)
+    meta_data = json.loads(meta_response) if meta_status == 200 else []
+
+    if not meta_data:
+        return {'streams': []}
+
+    # Construir resposta com metadados e streams
+    if type == "movie":
+        return {
+            'streams': [{
+                'name': 'Xtream Pro',
+                'title': meta_data['info'].get('name', "Stream"),
+                'url': f"{obj['baseURL']}/movie/{obj['username']}/{obj['password']}/{stream_id}.mp4",
+            }],
+        }
+    elif type == "series":
+        for season_, episodes in meta_data.get('episodes', {}).items():
+            for episode_ in episodes:
+                if int(episode_.get('season')) == int(season) and int(episode_.get('episode_num')) == int(episode):
+                    return {
+                        'streams': [{
+                            'name': 'Xtream Pro',
+                            'title': episode_.get('title', f"Episode {episode_.get('episode_num', '')}"),
+                            'url': f"{obj['baseURL']}/series/{obj['username']}/{obj['password']}/{episode_['id']}.mp4",
+                        }],
+                    }      
+    elif type == "tv":
+        for item in meta_data:
+            if int(item['stream_id']) == int(stream_id):
+                return {
                     'streams': [{
+                        'name': 'Xtream Pro',
                         'title': item.get('name', "Live Channel"),
                         'url': f"{obj['baseURL']}/live/{obj['username']}/{obj['password']}/{item['stream_id']}.m3u8",
                     }],
                 }
 
-    return []
+    return {'streams': []}

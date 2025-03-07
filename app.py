@@ -5,7 +5,7 @@ from jinja2 import Environment, FileSystemLoader
 from config import config
 import requests
 import base64
-from functions import get_manifest, get_catalog, get_meta, fix_b64
+from functions import get_manifest, get_catalog, get_meta, get_stream, fix_b64
 import sys
 
 templates = Environment(loader=FileSystemLoader("templates"))
@@ -92,9 +92,9 @@ async def meta(base64str: str, type: str, id: str, request: Request):
     return add_cors(JSONResponse(content={"meta": meta}))
 
 @app.get("/b64/{base64str}/stream/{type}/{id}.json")
-async def meta(base64str: str, type: str, id: str, request: Request):
-    meta = get_meta(base64str, type, id)
-    return add_cors(JSONResponse(content={"streams": meta.get("streams", [])}))
+async def stream(base64str: str, type: str, id: str, request: Request):
+    streams = get_stream(base64str, type, id)
+    return add_cors(JSONResponse(content={"streams": streams.get("streams", [])}))
 
 # if __name__ == "__main__":
 #     try:
