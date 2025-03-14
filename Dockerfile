@@ -14,5 +14,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Exponha a porta em que a aplicação irá rodar
-EXPOSE 80
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80", "--workers=3", "--log-level", "debug"]
+EXPOSE 8888
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8888", "--workers=3", "--log-level", "debug"]
